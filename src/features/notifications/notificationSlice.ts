@@ -1,6 +1,22 @@
-import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
 import type { Notification, NotificationStatus, SystemAlert } from '@/types';
-import { mockNotifications } from '@/lib/mockData';
+import { api } from '@/lib/apiClient';
+
+export const fetchAdminAlerts = createAsyncThunk<SystemAlert[]>(
+  'notifications/fetchAdminAlerts',
+  async () => {
+    const res = await api.get<{ alerts: SystemAlert[] }>('/api/alerts');
+    return res.alerts ?? [];
+  }
+);
+
+export const markAdminAlertRead = createAsyncThunk<string, string>(
+  'notifications/markAdminAlertRead',
+  async (id) => {
+    await api.patch(`/api/alerts/${id}`, {});
+    return id;
+  }
+);
 
 interface NotificationState {
   notifications: Notification[];
@@ -9,7 +25,7 @@ interface NotificationState {
 }
 
 const initialState: NotificationState = {
-  notifications: mockNotifications,
+  notifications: [],
   alerts: [],
   isLoading: false,
 };
@@ -62,6 +78,17 @@ const notificationSlice = createSlice({
     clearAlerts(state) {
       state.alerts = [];
     },
+  },
+  extraReducers: (b) => {
+    b.addCase(fetchAdminAlerts.fulfilled, (state, action) => {
+      // Merge: server alerts override matching ids; preserve any client-only alerts.
+      const serverIds = new Set(action.payload.map((a) => a.id));
+      const clientOnly = (state.alerts ?? []).filter((a) => !serverIds.has(a.id));
+      state.alerts = [...action.payload, ...clientOnly];
+    }).addCase(markAdminAlertRead.fulfilled, (state, action) => {
+      const alert = (state.alerts ?? []).find((a) => a.id === action.payload);
+      if (alert) alert.read = true;
+    });
   },
 });
 

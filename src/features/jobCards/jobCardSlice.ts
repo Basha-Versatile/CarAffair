@@ -1,7 +1,6 @@
-import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
 import type { JobCard, JobCardStatus, QuoteType } from '@/types';
-import { GST_RATE } from '@/types';
-import { mockJobCards } from '@/lib/mockData';
+import { api } from '@/lib/apiClient';
 
 interface JobCardState {
   jobCards: JobCard[];
@@ -14,7 +13,7 @@ interface JobCardState {
 }
 
 const initialState: JobCardState = {
-  jobCards: mockJobCards,
+  jobCards: [],
   selectedJobCard: null,
   statusFilter: 'all',
   searchQuery: '',
@@ -23,27 +22,60 @@ const initialState: JobCardState = {
   isLoading: false,
 };
 
+export const fetchJobCards = createAsyncThunk<JobCard[]>('jobCards/fetch', async () => {
+  const res = await api.get<{ jobCards: JobCard[] }>('/api/job-cards');
+  return res.jobCards ?? [];
+});
+
+export const createJobCard = createAsyncThunk<JobCard, Partial<JobCard>>('jobCards/create', async (data) => {
+  const res = await api.post<{ jobCard: JobCard }>('/api/job-cards', data);
+  return res.jobCard;
+});
+
+export const updateJobCardThunk = createAsyncThunk<JobCard, JobCard>('jobCards/update', async (job) => {
+  const res = await api.put<{ jobCard: JobCard }>(`/api/job-cards/${job.id}`, job);
+  return res.jobCard;
+});
+
+export const updateStatusThunk = createAsyncThunk<JobCard, { id: string; status: JobCardStatus }>(
+  'jobCards/updateStatus',
+  async ({ id, status }) => {
+    const res = await api.put<{ jobCard: JobCard }>(`/api/job-cards/${id}`, { status, updatedAt: new Date().toISOString() });
+    return res.jobCard;
+  }
+);
+
+export const deleteJobCardThunk = createAsyncThunk<string, string>('jobCards/delete', async (id) => {
+  await api.del(`/api/job-cards/${id}`);
+  return id;
+});
+
+export const sendQuoteThunk = createAsyncThunk<JobCard, { id: string; quoteToken: string; quoteType?: QuoteType }>(
+  'jobCards/sendQuote',
+  async ({ id, ...rest }) => {
+    const res = await api.put<{ jobCard: JobCard }>(`/api/job-cards/${id}`, {
+      quoteToken: rest.quoteToken,
+      quoteType: rest.quoteType ?? 'with_gst',
+      quoteStatus: 'sent',
+      quoteSentAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    return res.jobCard;
+  }
+);
+
+export const respondToQuoteThunk = createAsyncThunk<
+  JobCard,
+  { token: string; action: 'accepted' | 'rejected'; approvedServiceIds?: string[]; approvedPartIds?: string[] }
+>('jobCards/respondToQuote', async (payload) => {
+  const res = await api.post<{ jobCard: JobCard }>(`/api/quotes/${payload.token}`, payload);
+  return res.jobCard;
+});
+
 const jobCardSlice = createSlice({
   name: 'jobCards',
   initialState,
   reducers: {
-    addJobCard(state, action: PayloadAction<JobCard>) {
-      state.jobCards.unshift(action.payload);
-    },
-    updateJobCard(state, action: PayloadAction<JobCard>) {
-      const index = state.jobCards.findIndex((j) => j.id === action.payload.id);
-      if (index !== -1) state.jobCards[index] = action.payload;
-    },
-    updateJobCardStatus(state, action: PayloadAction<{ id: string; status: JobCardStatus }>) {
-      const job = state.jobCards.find((j) => j.id === action.payload.id);
-      if (job) {
-        job.status = action.payload.status;
-        job.updatedAt = new Date().toISOString();
-      }
-    },
-    deleteJobCard(state, action: PayloadAction<string>) {
-      state.jobCards = state.jobCards.filter((j) => j.id !== action.payload);
-    },
     setSelectedJobCard(state, action: PayloadAction<JobCard | null>) {
       state.selectedJobCard = action.payload;
     },
@@ -58,50 +90,51 @@ const jobCardSlice = createSlice({
     setCurrentPage(state, action: PayloadAction<number>) {
       state.currentPage = action.payload;
     },
-    sendQuote(state, action: PayloadAction<{ id: string; quoteToken: string; quoteType?: QuoteType }>) {
-      const job = state.jobCards.find((j) => j.id === action.payload.id);
-      if (job) {
-        job.quoteToken = action.payload.quoteToken;
-        job.quoteStatus = 'sent';
-        job.quoteSentAt = new Date().toISOString();
-        job.updatedAt = new Date().toISOString();
-        const quoteType: QuoteType = action.payload.quoteType ?? 'with_gst';
-        job.quoteType = quoteType;
-        const subtotal = job.estimatedCost;
-        const taxAmount = quoteType === 'with_gst' ? Math.round(subtotal * (GST_RATE / 100)) : 0;
-        job.quoteSubtotal = subtotal;
-        job.quoteTaxAmount = taxAmount;
-        job.quoteTotal = subtotal + taxAmount;
-      }
-    },
-    respondToQuote(state, action: PayloadAction<{ token: string; action: 'accepted' | 'rejected'; approvedServiceIds?: string[]; approvedPartIds?: string[] }>) {
-      const job = state.jobCards.find((j) => j.quoteToken === action.payload.token);
-      if (job) {
-        job.quoteStatus = action.payload.action;
-        job.quoteRespondedAt = new Date().toISOString();
-        job.updatedAt = new Date().toISOString();
-        if (action.payload.action === 'accepted') {
-          job.status = 'approved';
-          const approvedServiceIds = action.payload.approvedServiceIds ?? job.services.map((s) => s.id);
-          const approvedPartIds = action.payload.approvedPartIds ?? job.parts.map((p) => p.id);
-          job.approvedServiceIds = approvedServiceIds;
-          job.approvedPartIds = approvedPartIds;
-          const servicesCost = job.services.filter((s) => approvedServiceIds.includes(s.id)).reduce((sum, s) => sum + s.cost, 0);
-          const partsCost = job.parts.filter((p) => approvedPartIds.includes(p.id)).reduce((sum, p) => sum + p.totalCost, 0);
-          const subtotal = servicesCost + partsCost;
-          job.estimatedCost = subtotal;
-          job.quoteSubtotal = subtotal;
-          const taxAmount = job.quoteType === 'with_gst' ? Math.round(subtotal * (GST_RATE / 100)) : 0;
-          job.quoteTaxAmount = taxAmount;
-          job.quoteTotal = subtotal + taxAmount;
-        } else {
-          job.approvedServiceIds = [];
-          job.approvedPartIds = [];
-        }
-      }
-    },
+  },
+  extraReducers: (b) => {
+    b.addCase(fetchJobCards.pending, (s) => {
+      s.isLoading = true;
+    })
+      .addCase(fetchJobCards.fulfilled, (s, a) => {
+        s.jobCards = a.payload;
+        s.isLoading = false;
+      })
+      .addCase(fetchJobCards.rejected, (s) => {
+        s.isLoading = false;
+      })
+      .addCase(createJobCard.fulfilled, (s, a) => {
+        s.jobCards.unshift(a.payload);
+      })
+      .addCase(updateJobCardThunk.fulfilled, (s, a) => {
+        const idx = s.jobCards.findIndex((j) => j.id === a.payload.id);
+        if (idx !== -1) s.jobCards[idx] = a.payload;
+      })
+      .addCase(updateStatusThunk.fulfilled, (s, a) => {
+        const idx = s.jobCards.findIndex((j) => j.id === a.payload.id);
+        if (idx !== -1) s.jobCards[idx] = a.payload;
+      })
+      .addCase(deleteJobCardThunk.fulfilled, (s, a) => {
+        s.jobCards = s.jobCards.filter((j) => j.id !== a.payload);
+      })
+      .addCase(sendQuoteThunk.fulfilled, (s, a) => {
+        const idx = s.jobCards.findIndex((j) => j.id === a.payload.id);
+        if (idx !== -1) s.jobCards[idx] = a.payload;
+      })
+      .addCase(respondToQuoteThunk.fulfilled, (s, a) => {
+        const idx = s.jobCards.findIndex((j) => j.id === a.payload.id);
+        if (idx !== -1) s.jobCards[idx] = a.payload;
+        else s.jobCards.unshift(a.payload);
+      });
   },
 });
 
-export const { addJobCard, updateJobCard, updateJobCardStatus, deleteJobCard, setSelectedJobCard, setStatusFilter, setSearchQuery, setCurrentPage, sendQuote, respondToQuote } = jobCardSlice.actions;
+// Backwards-compatible aliases used across pages
+export const addJobCard = createJobCard;
+export const updateJobCard = updateJobCardThunk;
+export const updateJobCardStatus = updateStatusThunk;
+export const deleteJobCard = deleteJobCardThunk;
+export const sendQuote = sendQuoteThunk;
+export const respondToQuote = respondToQuoteThunk;
+
+export const { setSelectedJobCard, setStatusFilter, setSearchQuery, setCurrentPage } = jobCardSlice.actions;
 export default jobCardSlice.reducer;

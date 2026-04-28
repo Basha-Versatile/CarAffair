@@ -8,6 +8,7 @@ import billingReducer from '@/features/billing/billingSlice';
 import notificationReducer from '@/features/notifications/notificationSlice';
 import inventoryReducer from '@/features/inventory/inventorySlice';
 import servicesReducer from '@/features/services/servicesSlice';
+import slotsReducer from '@/features/slots/slotsSlice';
 
 const rootReducer = combineReducers({
   auth: authReducer,
@@ -17,12 +18,15 @@ const rootReducer = combineReducers({
   notifications: notificationReducer,
   inventory: inventoryReducer,
   services: servicesReducer,
+  slots: slotsReducer,
 });
 
 const persistConfig = {
-  key: 'caraffair-v3',
+  key: 'caraffair-v4',
   storage,
-  whitelist: ['jobCards', 'notifications', 'customers', 'auth', 'billing', 'inventory', 'services'],
+  // Source of truth is MongoDB; nothing is persisted client-side anymore.
+  // Auth is rehydrated via /api/auth/me on app boot.
+  whitelist: [] as string[],
 };
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

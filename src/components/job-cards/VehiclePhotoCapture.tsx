@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Camera, MapPin, Clock, Trash2, Loader2, X, RefreshCw, Aperture } from 'lucide-react';
+import { Camera, MapPin, Clock, Trash2, Loader2, X, RefreshCw, Aperture, Upload } from 'lucide-react';
 import type { VehiclePhoto } from '@/types';
 import { generateId } from '@/utils/format';
 
@@ -34,13 +34,42 @@ function frameToDataUrl(video: HTMLVideoElement, maxSize = 1280, quality = 0.85)
   return canvas.toDataURL('image/jpeg', quality);
 }
 
+function readFileAsDataURL(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+function downscaleImage(dataUrl: string, maxSize = 1280, quality = 0.85): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return resolve(dataUrl);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
 export default function VehiclePhotoCapture({ photos, onChange }: VehiclePhotoCaptureProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
 
   const [cameraOpen, setCameraOpen] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [isSnapping, setIsSnapping] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [viewingPhoto, setViewingPhoto] = useState<VehiclePhoto | null>(null);
@@ -125,6 +154,34 @@ export default function VehiclePhotoCapture({ photos, onChange }: VehiclePhotoCa
     }
   };
 
+  const handleUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setIsUploading(true);
+    try {
+      const position = await getCurrentPosition();
+      const uploaded: VehiclePhoto[] = [];
+      for (const file of Array.from(files)) {
+        if (!file.type.startsWith('image/')) continue;
+        const raw = await readFileAsDataURL(file);
+        const dataUrl = await downscaleImage(raw);
+        uploaded.push({
+          id: `photo-${generateId()}`,
+          dataUrl,
+          capturedAt: new Date(file.lastModified || Date.now()).toISOString(),
+          latitude: position?.coords.latitude,
+          longitude: position?.coords.longitude,
+          locationLabel: position
+            ? `${position.coords.latitude.toFixed(5)}, ${position.coords.longitude.toFixed(5)}`
+            : undefined,
+        });
+      }
+      if (uploaded.length > 0) onChange([...photos, ...uploaded]);
+    } finally {
+      setIsUploading(false);
+      if (uploadInputRef.current) uploadInputRef.current.value = '';
+    }
+  };
+
   const removePhoto = (id: string) => {
     onChange(photos.filter((p) => p.id !== id));
   };
@@ -135,20 +192,39 @@ export default function VehiclePhotoCapture({ photos, onChange }: VehiclePhotoCa
         <label className="block text-sm font-medium text-[var(--text-secondary)]">
           <span className="flex items-center gap-1.5"><Camera className="h-3.5 w-3.5" /> Vehicle Photos</span>
         </label>
-        <button
-          type="button"
-          onClick={openCamera}
-          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
-        >
-          <Camera className="h-3.5 w-3.5" /> Capture
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => uploadInputRef.current?.click()}
+            disabled={isUploading}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors cursor-pointer disabled:opacity-50"
+          >
+            {isUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+            Upload
+          </button>
+          <button
+            type="button"
+            onClick={openCamera}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+          >
+            <Camera className="h-3.5 w-3.5" /> Capture
+          </button>
+        </div>
       </div>
+      <input
+        ref={uploadInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={(e) => handleUpload(e.target.files)}
+      />
 
       {photos.length === 0 ? (
         <div className="p-6 rounded-xl bg-[var(--bg-tertiary)] border border-dashed border-[var(--border-color)] text-center">
           <Camera className="h-6 w-6 mx-auto text-[var(--text-tertiary)] mb-2" />
           <p className="text-xs text-[var(--text-tertiary)]">
-            Tap <span className="font-semibold text-red-500">Capture</span> to open the camera.
+            Tap <span className="font-semibold text-red-500">Capture</span> to open the camera, or <span className="font-semibold text-[var(--text-secondary)]">Upload</span> existing photos.
           </p>
           <p className="text-[10px] text-[var(--text-tertiary)] mt-1">Each photo is stamped with time and GPS location.</p>
         </div>

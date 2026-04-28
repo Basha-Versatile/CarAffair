@@ -5,24 +5,40 @@ import { useParams } from 'next/navigation';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, XCircle, Wrench, Package, FileText, AlertTriangle, Check, Camera, Clock, MapPin } from 'lucide-react';
-import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import { respondToQuote } from '@/features/jobCards/jobCardSlice';
-import { updateNotificationsByToken, addAlert } from '@/features/notifications/notificationSlice';
-import { formatCurrency, formatDate, generateId } from '@/utils/format';
+import { formatCurrency, formatDate } from '@/utils/format';
 import { GST_RATE } from '@/types';
+import type { JobCard } from '@/types';
+import { api } from '@/lib/apiClient';
 
 export default function QuoteApprovalPage() {
   const params = useParams();
   const token = params.token as string;
-  const dispatch = useAppDispatch();
   const [customerNote, setCustomerNote] = useState('');
   const [responded, setResponded] = useState(false);
   const [approvedServiceIds, setApprovedServiceIds] = useState<Set<string>>(new Set());
   const [approvedPartIds, setApprovedPartIds] = useState<Set<string>>(new Set());
+  const [jobCard, setJobCard] = useState<JobCard | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const jobCard = useAppSelector((state) =>
-    state.jobCards.jobCards.find((j) => j.quoteToken === token)
-  );
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoading(true);
+    api
+      .get<{ jobCard: JobCard }>(`/api/quotes/${token}`)
+      .then((res) => {
+        if (!cancelled) setJobCard(res.jobCard);
+      })
+      .catch((err) => {
+        if (!cancelled) setLoadError(err instanceof Error ? err.message : 'Quote not found');
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   // Default-select every line item once the quote loads (or after a status change clears the response state).
   useEffect(() => {
@@ -61,35 +77,34 @@ export default function QuoteApprovalPage() {
   const approvedTotal = approvedSubtotal + approvedTax;
   const nothingApproved = approvedServiceIds.size === 0 && approvedPartIds.size === 0;
 
-  const handleResponse = (action: 'accepted' | 'rejected') => {
+  const handleResponse = async (action: 'accepted' | 'rejected') => {
     if (!jobCard) return;
     if (action === 'accepted' && nothingApproved) return;
-    dispatch(respondToQuote({
-      token,
-      action,
-      ...(action === 'accepted' ? {
-        approvedServiceIds: Array.from(approvedServiceIds),
-        approvedPartIds: Array.from(approvedPartIds),
-      } : {}),
-    }));
-    dispatch(updateNotificationsByToken({
-      quoteToken: token,
-      status: action,
-      timestamp: new Date().toISOString(),
-    }));
-    const alertAmount = action === 'accepted' ? approvedTotal : jobCard.estimatedCost;
-    dispatch(addAlert({
-      id: `alert-${generateId()}`,
-      type: action === 'accepted' ? 'quote_accepted' : 'quote_rejected',
-      title: action === 'accepted' ? 'Quote Approved' : 'Quote Declined',
-      message: `${jobCard.customerName} has ${action} the quote for ${jobCard.vehicleName} (${formatCurrency(alertAmount)})`,
-      customerName: jobCard.customerName,
-      vehicleName: jobCard.vehicleName,
-      read: false,
-      createdAt: new Date().toISOString(),
-    }));
-    setResponded(true);
+    try {
+      const res = await api.post<{ jobCard: JobCard }>(`/api/quotes/${token}`, {
+        action,
+        ...(action === 'accepted'
+          ? {
+              approvedServiceIds: Array.from(approvedServiceIds),
+              approvedPartIds: Array.from(approvedPartIds),
+              customerNote,
+            }
+          : { customerNote }),
+      });
+      setJobCard(res.jobCard);
+      setResponded(true);
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Could not submit response');
+    }
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center p-6">
+        <p className="text-sm text-[var(--text-tertiary)] animate-pulse">Loading quote…</p>
+      </div>
+    );
+  }
 
   if (!jobCard) {
     return (
@@ -99,7 +114,7 @@ export default function QuoteApprovalPage() {
             <AlertTriangle className="w-8 h-8 text-yellow-400" />
           </div>
           <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-2">Quote Not Found</h1>
-          <p className="text-[var(--text-tertiary)]">This quote link is invalid or has expired. Please contact Car Affair for assistance.</p>
+          <p className="text-[var(--text-tertiary)]">{loadError ?? 'This quote link is invalid or has expired. Please contact Car Affair for assistance.'}</p>
         </motion.div>
       </div>
     );

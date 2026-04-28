@@ -5,12 +5,13 @@ import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Sun, Moon, Bell, Search, User, Settings, LogOut, ChevronDown,
-  CheckCircle, XCircle, CreditCard, Star, MessageSquare, Clock,
+  CheckCircle, XCircle, CreditCard, Star, MessageSquare, Clock, CalendarDays,
 } from 'lucide-react';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import { markAlertRead, markAllAlertsRead } from '@/features/notifications/notificationSlice';
+import { markAdminAlertRead, markAllAlertsRead } from '@/features/notifications/notificationSlice';
 import { useToast } from '@/components/ui/Toast';
 import { formatDateTime } from '@/utils/format';
+import { useSignOut } from '@/hooks/useSignOut';
 import Link from 'next/link';
 import type { AlertType } from '@/types';
 
@@ -21,6 +22,7 @@ const alertConfig: Record<AlertType, { icon: typeof CheckCircle; color: string; 
   review_submitted: { icon: Star, color: 'text-yellow-500', bg: 'bg-yellow-500/10' },
   job_created: { icon: MessageSquare, color: 'text-purple-500', bg: 'bg-purple-500/10' },
   status_updated: { icon: Clock, color: 'text-cyan-500', bg: 'bg-cyan-500/10' },
+  booking_created: { icon: CalendarDays, color: 'text-red-500', bg: 'bg-red-500/10' },
 };
 
 export default function Header() {
@@ -32,6 +34,7 @@ export default function Header() {
   const alerts = useAppSelector((state) => state.notifications.alerts ?? []);
   const dispatch = useAppDispatch();
   const toast = useToast();
+  const signOut = useSignOut();
   const dropdownRef = useRef<HTMLDivElement>(null);
   const bellRef = useRef<HTMLDivElement>(null);
 
@@ -107,7 +110,10 @@ export default function Header() {
                     </div>
                     {unreadCount > 0 && (
                       <button
-                        onClick={() => dispatch(markAllAlertsRead())}
+                        onClick={() => {
+                          dispatch(markAllAlertsRead());
+                          alerts.filter((a) => !a.read).forEach((a) => dispatch(markAdminAlertRead(a.id)));
+                        }}
                         className="text-[11px] text-red-500 hover:text-red-400 font-medium cursor-pointer transition-colors"
                       >
                         Mark all read
@@ -132,7 +138,7 @@ export default function Header() {
                             initial={idx < 3 ? { opacity: 0, x: -10 } : false}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: idx * 0.05 }}
-                            onClick={() => dispatch(markAlertRead(alert.id))}
+                            onClick={() => { if (!alert.read) dispatch(markAdminAlertRead(alert.id)); }}
                             className={`flex items-start gap-3 px-4 py-3 border-b border-[var(--border-color)] hover:bg-[var(--bg-tertiary)] transition-colors cursor-pointer ${!alert.read ? 'bg-[var(--bg-tertiary)]/50' : ''}`}
                           >
                             <div className={`flex-shrink-0 w-9 h-9 rounded-xl ${config.bg} flex items-center justify-center mt-0.5`}>
@@ -202,14 +208,21 @@ export default function Header() {
                     </div>
                   </div>
                   <div className="py-1">
-                    <Link href="/dashboard/settings" onClick={() => setProfileOpen(false)}
+                    <Link href="/admin/settings" onClick={() => setProfileOpen(false)}
                       className="flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-all">
                       <Settings className="h-4 w-4" /> Settings
                     </Link>
-                    <Link href="/login" onClick={() => { setProfileOpen(false); toast.info('Signed Out', 'You have been logged out'); }}
-                      className="flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setProfileOpen(false);
+                        await signOut();
+                        toast.info('Signed Out', 'You have been logged out');
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all cursor-pointer"
+                    >
                       <LogOut className="h-4 w-4" /> Logout
-                    </Link>
+                    </button>
                   </div>
                 </motion.div>
               )}

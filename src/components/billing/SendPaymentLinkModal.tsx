@@ -48,9 +48,14 @@ export default function SendPaymentLinkModal({ isOpen, onClose, bill }: SendPaym
     }
 
     setIsSending(true);
-    await new Promise((r) => setTimeout(r, 1500));
-
-    const token = simulateSendPaymentNotification(dispatch, bill, channels);
+    let token: string;
+    try {
+      token = await simulateSendPaymentNotification(dispatch, bill, channels);
+    } catch (err) {
+      setIsSending(false);
+      toast.error('Send Failed', err instanceof Error ? err.message : 'Could not save payment link');
+      return;
+    }
     const link = `${window.location.origin}/payment/${token}`;
     setPaymentLink(link);
     setIsSending(false);

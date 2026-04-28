@@ -1,27 +1,48 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Star, CheckCircle, AlertTriangle, MessageSquare } from 'lucide-react';
-import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import { submitReview } from '@/features/billing/billingSlice';
-import { addAlert } from '@/features/notifications/notificationSlice';
-import { generateId } from '@/utils/format';
+import type { Bill } from '@/types';
+import { api } from '@/lib/apiClient';
 
 export default function ReviewPage() {
   const params = useParams();
   const token = params.token as string;
-  const dispatch = useAppDispatch();
   const [rating, setRating] = useState(0);
   const [hoveredStar, setHoveredStar] = useState(0);
   const [comment, setComment] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [bill, setBill] = useState<Bill | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const bill = useAppSelector((state) =>
-    state.billing.bills.find((b) => b.reviewToken === token)
-  );
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get<{ bill: Bill }>(`/api/reviews/${token}`)
+      .then((res) => {
+        if (!cancelled) setBill(res.bill);
+      })
+      .catch(() => {
+        if (!cancelled) setBill(null);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center p-6">
+        <p className="text-sm text-[var(--text-tertiary)] animate-pulse">Loading…</p>
+      </div>
+    );
+  }
 
   if (!bill) {
     return (
@@ -41,20 +62,15 @@ export default function ReviewPage() {
 
   const ratingLabels = ['', 'Poor', 'Fair', 'Good', 'Very Good', 'Excellent'];
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (rating === 0) return;
-    dispatch(submitReview({ token, rating, comment }));
-    dispatch(addAlert({
-      id: `alert-${generateId()}`,
-      type: 'review_submitted',
-      title: 'New Review Received',
-      message: `${bill.customerName} rated ${rating}/5 stars${comment ? `: "${comment.slice(0, 80)}${comment.length > 80 ? '...' : ''}"` : ''} for ${bill.vehicleName}`,
-      customerName: bill.customerName,
-      vehicleName: bill.vehicleName,
-      read: false,
-      createdAt: new Date().toISOString(),
-    }));
-    setSubmitted(true);
+    try {
+      const res = await api.post<{ bill: Bill }>(`/api/reviews/${token}`, { rating, comment });
+      setBill(res.bill);
+      setSubmitted(true);
+    } catch {
+      // leave on the form
+    }
   };
 
   return (

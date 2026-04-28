@@ -79,18 +79,18 @@ export function formatEmailMessage(jobCard: JobCard, quoteUrl: string, quoteType
   ].filter(Boolean).join('\n');
 }
 
-export function simulateSendNotification(
+export async function simulateSendNotification(
   dispatch: AppDispatch,
   jobCard: JobCard,
   channels: NotificationChannel[],
   quoteType: QuoteType = 'with_gst'
-): string {
+): Promise<string> {
   const token = jobCard.quoteToken || generateQuoteToken();
   const quoteUrl = `${window.location.origin}/quote/${token}`;
 
-  // Update job card with quote token + chosen quote type
+  // Persist quote token + type to MongoDB before returning the link to the user.
   if (!jobCard.quoteToken) {
-    dispatch(sendQuote({ id: jobCard.id, quoteToken: token, quoteType }));
+    await dispatch(sendQuote({ id: jobCard.id, quoteToken: token, quoteType }));
   }
 
   // Send notification for each channel
@@ -248,18 +248,18 @@ export function formatReviewEmailMessage(bill: Bill, reviewUrl: string): string 
   ].join('\n');
 }
 
-export function simulateSendReviewNotification(
+export async function simulateSendReviewNotification(
   dispatch: AppDispatch,
   bill: Bill,
   options?: { byPaymentToken?: boolean }
-): string {
+): Promise<string> {
   const token = generateReviewToken();
   const reviewUrl = `${window.location.origin}/review/${token}`;
 
   if (options?.byPaymentToken && bill.paymentToken) {
-    dispatch(sendReviewLinkByPaymentToken({ paymentToken: bill.paymentToken, reviewToken: token }));
+    await dispatch(sendReviewLinkByPaymentToken({ paymentToken: bill.paymentToken, reviewToken: token }));
   } else {
-    dispatch(sendReviewLink({ id: bill.id, reviewToken: token }));
+    await dispatch(sendReviewLink({ id: bill.id, reviewToken: token }));
   }
 
   const channels: NotificationChannel[] = ['whatsapp', 'email'];
@@ -347,16 +347,16 @@ export function formatPaymentEmailMessage(bill: Bill, paymentUrl: string): strin
   ].filter(Boolean).join('\n');
 }
 
-export function simulateSendPaymentNotification(
+export async function simulateSendPaymentNotification(
   dispatch: AppDispatch,
   bill: Bill,
   channels: NotificationChannel[]
-): string {
+): Promise<string> {
   const token = bill.paymentToken || generatePaymentToken();
   const paymentUrl = `${window.location.origin}/payment/${token}`;
 
   if (!bill.paymentToken) {
-    dispatch(sendPaymentLink({ id: bill.id, paymentToken: token }));
+    await dispatch(sendPaymentLink({ id: bill.id, paymentToken: token }));
   }
 
   channels.forEach((channel) => {

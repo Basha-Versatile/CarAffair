@@ -1,8 +1,10 @@
+export type UserRole = 'admin' | 'staff' | 'customer';
+
 export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'staff';
+  role: UserRole;
   avatar?: string;
 }
 
@@ -121,7 +123,42 @@ export interface QuoteResponse {
   customerNote?: string;
 }
 
-export type AlertType = 'quote_accepted' | 'quote_rejected' | 'payment_received' | 'review_submitted' | 'job_created' | 'status_updated';
+export type AlertType =
+  | 'quote_accepted'
+  | 'quote_rejected'
+  | 'payment_received'
+  | 'review_submitted'
+  | 'job_created'
+  | 'status_updated'
+  | 'booking_created';
+
+export interface Slot {
+  id: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  status: 'available' | 'booked' | 'disabled';
+  bookingId?: string;
+  createdAt?: string;
+}
+
+export interface Booking {
+  id: string;
+  slotId: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  customerId: string;
+  customerName: string;
+  phone: string;
+  email?: string;
+  vehicleId?: string;
+  registrationNumber: string;
+  vehicleSummary?: string;
+  notes?: string;
+  status: 'confirmed' | 'cancelled';
+  createdAt?: string;
+}
 
 export interface SystemAlert {
   id: string;

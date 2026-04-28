@@ -57,10 +57,14 @@ export default function SendQuoteModal({ isOpen, onClose, jobCard }: SendQuoteMo
     }
 
     setIsSending(true);
-    // Simulate network delay
-    await new Promise((r) => setTimeout(r, 1500));
-
-    const token = simulateSendNotification(dispatch, jobCard, channels, quoteType);
+    let token: string;
+    try {
+      token = await simulateSendNotification(dispatch, jobCard, channels, quoteType);
+    } catch (err) {
+      setIsSending(false);
+      toast.error('Send Failed', err instanceof Error ? err.message : 'Could not save quote');
+      return;
+    }
     const link = `${window.location.origin}/quote/${token}`;
     setQuoteLink(link);
     setIsSending(false);

@@ -1,27 +1,54 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, AlertTriangle, CreditCard, QrCode, Banknote, Wrench, Package, Shield } from 'lucide-react';
-import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import { markBillPaidByToken } from '@/features/billing/billingSlice';
-import { updateNotificationsByToken, addAlert } from '@/features/notifications/notificationSlice';
-import { simulateSendReviewNotification } from '@/services/notificationService';
-import { formatCurrency, formatDate, generateId } from '@/utils/format';
+import type { Bill } from '@/types';
+import { api } from '@/lib/apiClient';
+import { formatCurrency, formatDate } from '@/utils/format';
 
 type PaymentMethod = 'cash' | 'card' | 'qr';
 
 export default function PaymentPage() {
   const params = useParams();
   const token = params.token as string;
-  const dispatch = useAppDispatch();
   const [step, setStep] = useState<'invoice' | 'method' | 'confirm' | 'success'>('invoice');
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(null);
   const [reviewLink, setReviewLink] = useState('');
+  const [bill, setBill] = useState<Bill | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const bill = useAppSelector((state) => state.billing.bills.find((b) => b.paymentToken === token));
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get<{ bill: Bill }>(`/api/payments/${token}`)
+      .then((res) => {
+        if (cancelled) return;
+        setBill(res.bill);
+        if (res.bill.reviewToken && res.bill.reviewStatus !== 'submitted') {
+          setReviewLink(`${window.location.origin}/review/${res.bill.reviewToken}`);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setBill(null);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center p-6">
+        <p className="text-sm text-[var(--text-tertiary)] animate-pulse">Loading invoice…</p>
+      </div>
+    );
+  }
 
   if (!bill) {
     return (
@@ -39,27 +66,18 @@ export default function PaymentPage() {
 
   const alreadyPaid = bill.status === 'paid';
 
-  const handlePay = () => {
+  const handlePay = async () => {
     if (!selectedMethod) return;
-    dispatch(markBillPaidByToken({ token, paymentMethod: selectedMethod }));
-    dispatch(updateNotificationsByToken({ quoteToken: token, status: 'opened', timestamp: new Date().toISOString() }));
-    dispatch(addAlert({
-      id: `alert-${generateId()}`,
-      type: 'payment_received',
-      title: 'Payment Received',
-      message: `${bill.customerName} paid ${formatCurrency(bill.total)} for ${bill.vehicleName} via ${selectedMethod === 'qr' ? 'UPI' : selectedMethod}`,
-      customerName: bill.customerName,
-      vehicleName: bill.vehicleName,
-      read: false,
-      createdAt: new Date().toISOString(),
-    }));
-    setStep('success');
-    setTimeout(() => {
-      if (bill) {
-        const revToken = simulateSendReviewNotification(dispatch, bill, { byPaymentToken: true });
-        setReviewLink(`${window.location.origin}/review/${revToken}`);
+    try {
+      const res = await api.post<{ bill: Bill }>(`/api/payments/${token}`, { paymentMethod: selectedMethod });
+      setBill(res.bill);
+      setStep('success');
+      if (res.bill.reviewToken && res.bill.reviewStatus !== 'submitted') {
+        setReviewLink(`${window.location.origin}/review/${res.bill.reviewToken}`);
       }
-    }, 2000);
+    } catch {
+      // leave on confirm step; user can retry
+    }
   };
 
   const paymentMethods: { id: PaymentMethod; label: string; desc: string; icon: typeof CreditCard }[] = [
@@ -102,6 +120,17 @@ export default function PaymentPage() {
                 This invoice has already been paid{bill.paymentMethod ? ` via ${bill.paymentMethod}` : ''}. Thank you, {bill.customerName}!
               </p>
               {bill.paidAt && <p className="text-[var(--text-tertiary)] text-sm mt-3">Paid on {formatDate(bill.paidAt)}</p>}
+              {reviewLink && (
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="mt-8">
+                  <p className="text-[var(--text-tertiary)] text-sm mb-3">We&apos;d love your feedback!</p>
+                  <a href={reviewLink} className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-red-600 to-red-700 text-white font-semibold text-sm hover:from-red-500 hover:to-red-600 transition-all shadow-lg shadow-red-600/20">
+                    Leave a Review
+                  </a>
+                </motion.div>
+              )}
+              {bill.reviewStatus === 'submitted' && (
+                <p className="text-[var(--text-tertiary)] text-sm mt-6">Thanks for your review!</p>
+              )}
             </motion.div>
           ) : step === 'success' ? (
             <motion.div key="success" initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} className="text-center py-20">

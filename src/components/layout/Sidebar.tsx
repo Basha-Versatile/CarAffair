@@ -13,20 +13,25 @@ import {
   Receipt,
   Package,
   Star,
+  CalendarDays,
   ChevronLeft,
   ChevronRight,
+  LogOut,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
+import { useAppSelector } from '@/store/hooks';
+import { useSignOut } from '@/hooks/useSignOut';
 
 const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, badge: '' },
-  { href: '/dashboard/customers', label: 'Customers', icon: Users, badge: '' },
-  { href: '/dashboard/vehicles', label: 'Vehicles', icon: Car, badge: '' },
-  { href: '/dashboard/job-cards', label: 'Jobs', icon: ClipboardList, badge: '3' },
-  { href: '/dashboard/billing', label: 'Billing', icon: Receipt, badge: '' },
-  { href: '/dashboard/inventory', label: 'Inventory', icon: Package, badge: '' },
-  { href: '/dashboard/services', label: 'Services', icon: Wrench, badge: '' },
-  { href: '/dashboard/reviews', label: 'Reviews', icon: Star, badge: '' },
+  { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, badge: '' },
+  { href: '/admin/customers', label: 'Customers', icon: Users, badge: '' },
+  { href: '/admin/vehicles', label: 'Vehicles', icon: Car, badge: '' },
+  { href: '/admin/job-cards', label: 'Jobs', icon: ClipboardList, badge: '' },
+  { href: '/admin/slots', label: 'Slots', icon: CalendarDays, badge: '' },
+  { href: '/admin/billing', label: 'Billing', icon: Receipt, badge: '' },
+  { href: '/admin/inventory', label: 'Inventory', icon: Package, badge: '' },
+  { href: '/admin/services', label: 'Services', icon: Wrench, badge: '' },
+  { href: '/admin/reviews', label: 'Reviews', icon: Star, badge: '' },
 ];
 
 interface SidebarProps {
@@ -36,6 +41,12 @@ interface SidebarProps {
 
 export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname();
+  const user = useAppSelector((s) => s.auth.user);
+  const signOut = useSignOut();
+
+  const handleLogout = async () => {
+    await signOut();
+  };
 
   return (
     <motion.aside
@@ -63,7 +74,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
       {/* Logo Section */}
       <div className="relative z-10 border-b border-[var(--border-color)]">
-        <Link href="/dashboard" className={cn('flex items-center overflow-hidden transition-all duration-300', collapsed ? 'justify-center px-2 py-3' : 'justify-start px-4 py-4')}>
+        <Link href="/admin" className={cn('flex items-center overflow-hidden transition-all duration-300', collapsed ? 'justify-center px-2 py-3' : 'justify-start px-4 py-4')}>
           {collapsed ? (
             <div className="relative w-10 h-10 transition-all duration-300">
               <Image
@@ -105,7 +116,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
         <nav className="space-y-1">
           {navItems.map((item) => {
-            const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
+            const isActive = pathname === item.href || (item.href !== '/admin' && pathname.startsWith(item.href));
             return (
               <Link key={item.href} href={item.href}>
                 <motion.div
@@ -161,6 +172,38 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
             );
           })}
         </nav>
+
+        {/* <div className="mt-auto pt-3 border-t border-[var(--border-color)]">
+          {!collapsed && user && (
+            <div className="px-3 py-2 mb-1.5">
+              <p className="text-sm font-medium text-[var(--text-primary)] truncate">{user.name}</p>
+              <p className="text-[11px] text-[var(--text-tertiary)] truncate">{user.email}</p>
+              <p className="text-[10px] uppercase tracking-wider text-red-500 font-semibold mt-0.5">{user.role}</p>
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={handleLogout}
+            className={cn(
+              'group relative w-full flex items-center gap-3 transition-all duration-200 cursor-pointer text-[var(--text-secondary)] hover:text-red-500 hover:bg-red-500/10',
+              collapsed ? 'justify-center p-2.5 rounded-2xl' : 'px-3 py-2.5 rounded-xl'
+            )}
+            title="Sign out"
+          >
+            <div className={cn(
+              'flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center bg-[var(--bg-tertiary)] group-hover:bg-red-500/20 transition-colors'
+            )}>
+              <LogOut className="h-[18px] w-[18px]" />
+            </div>
+            {!collapsed && <span className="text-sm font-medium">Sign out</span>}
+            {collapsed && (
+              <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-3 py-1.5 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 scale-90 group-hover:scale-100 whitespace-nowrap z-50">
+                <span className="text-xs font-medium text-[var(--text-primary)]">Sign out</span>
+                <div className="absolute top-1/2 -translate-y-1/2 -left-1 w-2 h-2 rotate-45 bg-[var(--bg-secondary)] border-l border-b border-[var(--border-color)]" />
+              </div>
+            )}
+          </button>
+        </div> */}
       </div>
     </motion.aside>
   );
