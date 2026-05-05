@@ -76,11 +76,11 @@ export async function DELETE(req: Request) {
     if (!date || !DATE_RE.test(date)) throw new ApiError('A valid date is required');
 
     const targets = await Slot.find({ date, status: { $ne: 'booked' } }).lean();
-    const ids = (targets as unknown as { _id: unknown }[]).map((t) => t._id);
+    const ids: string[] = (targets as unknown as { _id: unknown }[]).map((t) => String(t._id));
     if (ids.length === 0) return NextResponse.json({ deleted: 0, ids: [] });
 
     await Slot.deleteMany({ _id: { $in: ids } });
-    return NextResponse.json({ deleted: ids.length, ids: ids.map((i) => String(i)) });
+    return NextResponse.json({ deleted: ids.length, ids });
   } catch (err) {
     return apiError(err);
   }
