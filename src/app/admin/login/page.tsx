@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { useForm } from 'react-hook-form';
@@ -34,7 +34,6 @@ export default function LoginPage() {
 }
 
 function LoginPageInner() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const dispatch = useAppDispatch();
   const [showPassword, setShowPassword] = useState(false);
@@ -56,14 +55,23 @@ function LoginPageInner() {
       }
       toast.success('Welcome back!', `Signed in as ${data.email}`);
       const role = result.payload?.role;
-      const fallback = role === 'customer' ? '/me' : '/admin';
-      // Honour ?next= but only if it stays inside the user's allowed namespace.
-      const isStaff = role === 'admin' || role === 'staff';
+      const isAdmin = role === 'admin' || role === 'staff';
+      const isWorkforce = role === 'service_advisor' || role === 'mechanic' || role === 'primary_technician';
+      const isStaffSide = isAdmin || isWorkforce;
+      const fallback = isAdmin
+        ? '/admin'
+        : isWorkforce
+          ? '/admin/job-cards'
+          : role === 'customer'
+            ? '/me'
+            : '/admin';
+      // Honour ?next= only if it stays inside the user's allowed namespace.
       const safeNext = next && (
-        (isStaff && next.startsWith('/admin') && !next.startsWith('/admin/login') && !next.startsWith('/admin/register')) ||
+        (isStaffSide && next.startsWith('/admin') && !next.startsWith('/admin/login') && !next.startsWith('/admin/register')) ||
         (role === 'customer' && next.startsWith('/me'))
       ) ? next : fallback;
-      router.push(safeNext);
+      // Hard navigation so server components (workspace layout) re-evaluate with the new cookie.
+      window.location.assign(safeNext);
     } finally {
       setIsLoading(false);
     }

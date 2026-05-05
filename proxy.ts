@@ -3,7 +3,15 @@ import { jwtVerify } from 'jose';
 
 const COOKIE_NAME = 'caraffair_session';
 
-type Role = 'admin' | 'staff' | 'customer';
+type Role =
+  | 'admin'
+  | 'staff'
+  | 'customer'
+  | 'service_advisor'
+  | 'mechanic'
+  | 'primary_technician';
+
+const STAFF_ROLES: Role[] = ['admin', 'staff', 'service_advisor', 'mechanic', 'primary_technician'];
 
 interface SessionPayload {
   sub?: string;
@@ -24,11 +32,13 @@ async function readSession(token: string | undefined): Promise<SessionPayload | 
 
 function homeFor(role: Role | undefined): string {
   if (role === 'admin' || role === 'staff') return '/admin';
+  if (role === 'service_advisor') return '/admin/job-cards';
+  if (role === 'mechanic' || role === 'primary_technician') return '/admin/job-cards';
   if (role === 'customer') return '/me';
   return '/';
 }
 
-const ADMIN_AUTH_PATHS = new Set(['/admin/login', '/admin/register']);
+const ADMIN_AUTH_PATHS = new Set(['/admin/login']);
 
 export async function proxy(req: NextRequest) {
   const token = req.cookies.get(COOKIE_NAME)?.value;
@@ -55,7 +65,7 @@ export async function proxy(req: NextRequest) {
       url.searchParams.set('next', path);
       return NextResponse.redirect(url);
     }
-    if (session.role !== 'admin' && session.role !== 'staff') {
+    if (!STAFF_ROLES.includes(session.role as Role)) {
       const url = req.nextUrl.clone();
       url.pathname = homeFor(session.role);
       return NextResponse.redirect(url);

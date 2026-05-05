@@ -12,11 +12,19 @@ function getSecret(): Uint8Array {
   return new TextEncoder().encode(secret);
 }
 
+export type SessionRole =
+  | 'admin'
+  | 'staff'
+  | 'customer'
+  | 'service_advisor'
+  | 'mechanic'
+  | 'primary_technician';
+
 export interface SessionPayload {
   sub: string;
   email: string;
   name: string;
-  role: 'admin' | 'staff' | 'customer';
+  role: SessionRole;
 }
 
 export async function hashPassword(password: string): Promise<string> {
@@ -56,6 +64,15 @@ export async function requireUser(): Promise<SessionPayload> {
   if (!user) throw new ApiError('Unauthorized', 401);
   return user;
 }
+
+export async function requireRole(allowed: SessionRole[]): Promise<SessionPayload> {
+  const user = await requireUser();
+  if (!allowed.includes(user.role)) throw new ApiError('Forbidden', 403);
+  return user;
+}
+
+export const STAFF_ROLES: SessionRole[] = ['admin', 'staff', 'service_advisor', 'mechanic', 'primary_technician'];
+export const ADMIN_ROLES: SessionRole[] = ['admin', 'staff'];
 
 export function setSessionCookie(res: NextResponse, token: string) {
   res.cookies.set(COOKIE_NAME, token, {

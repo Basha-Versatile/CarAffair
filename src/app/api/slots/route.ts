@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import { Slot } from '@/models/Slot';
-import { ApiError, apiError, requireUser } from '@/lib/auth';
+import { ApiError, apiError, requireUser, requireRole, ADMIN_ROLES } from '@/lib/auth';
 import { listJSON, toJSON } from '@/lib/serialize';
 
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -60,6 +60,27 @@ export async function POST(req: Request) {
       status: 'available',
     });
     return NextResponse.json({ slot: toJSON(created as never) });
+  } catch (err) {
+    return apiError(err);
+  }
+}
+
+// Bulk delete unbooked slots for a single date.
+// Booked slots are protected and never removed.
+export async function DELETE(req: Request) {
+  try {
+    await requireRole(ADMIN_ROLES);
+    await connectDB();
+    const { searchParams } = new URL(req.url);
+    const date = searchParams.get('date');
+    if (!date || !DATE_RE.test(date)) throw new ApiError('A valid date is required');
+
+    const targets = await Slot.find({ date, status: { $ne: 'booked' } }).lean();
+    const ids = (targets as unknown as { _id: unknown }[]).map((t) => t._id);
+    if (ids.length === 0) return NextResponse.json({ deleted: 0, ids: [] });
+
+    await Slot.deleteMany({ _id: { $in: ids } });
+    return NextResponse.json({ deleted: ids.length, ids: ids.map((i) => String(i)) });
   } catch (err) {
     return apiError(err);
   }

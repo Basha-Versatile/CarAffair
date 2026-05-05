@@ -47,6 +47,34 @@ export const deleteSlot = createAsyncThunk<string, string>('slots/delete', async
   return id;
 });
 
+export interface BulkScheduleRequest {
+  from: string;
+  to: string;
+  weekdays: number[];
+  blocks: { startTime: string; endTime: string }[];
+}
+
+export interface BulkScheduleResponse {
+  created: number;
+  skipped: { date: string; startTime: string; endTime: string; reason: string }[];
+  slots: Slot[];
+}
+
+export const scheduleSlots = createAsyncThunk<BulkScheduleResponse, BulkScheduleRequest>(
+  'slots/schedule',
+  async (payload) => {
+    return api.post<BulkScheduleResponse>('/api/slots/bulk', payload);
+  }
+);
+
+export const clearDaySlots = createAsyncThunk<{ date: string; deletedIds: string[] }, string>(
+  'slots/clearDay',
+  async (date) => {
+    const res = await api.del<{ deleted: number; ids: string[] }>(`/api/slots?date=${encodeURIComponent(date)}`);
+    return { date, deletedIds: res.ids ?? [] };
+  }
+);
+
 const slotsSlice = createSlice({
   name: 'slots',
   initialState,
@@ -73,6 +101,18 @@ const slotsSlice = createSlice({
       })
       .addCase(deleteSlot.fulfilled, (s, a) => {
         s.slots = s.slots.filter((x) => x.id !== a.payload);
+      })
+      .addCase(scheduleSlots.fulfilled, (s, a) => {
+        for (const slot of a.payload.slots) {
+          s.slots.push(slot);
+        }
+        s.slots.sort((x, y) =>
+          x.date === y.date ? x.startTime.localeCompare(y.startTime) : x.date.localeCompare(y.date)
+        );
+      })
+      .addCase(clearDaySlots.fulfilled, (s, a) => {
+        const idSet = new Set(a.payload.deletedIds);
+        s.slots = s.slots.filter((x) => !idSet.has(x.id));
       });
   },
 });

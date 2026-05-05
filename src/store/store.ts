@@ -9,6 +9,7 @@ import notificationReducer from '@/features/notifications/notificationSlice';
 import inventoryReducer from '@/features/inventory/inventorySlice';
 import servicesReducer from '@/features/services/servicesSlice';
 import slotsReducer from '@/features/slots/slotsSlice';
+import usersReducer from '@/features/users/usersSlice';
 
 const rootReducer = combineReducers({
   auth: authReducer,
@@ -19,6 +20,7 @@ const rootReducer = combineReducers({
   inventory: inventoryReducer,
   services: servicesReducer,
   slots: slotsReducer,
+  users: usersReducer,
 });
 
 const persistConfig = {

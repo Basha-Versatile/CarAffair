@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -66,10 +67,28 @@ const defaultAssignees: Assignment[] = [
 
 export default function JobCardsPage() {
   const dispatch = useAppDispatch();
+  const router = useRouter();
   const { jobCards, statusFilter, searchQuery, currentPage, pageSize, isLoading } = useAppSelector((state) => state.jobCards);
   const { customers } = useAppSelector((state) => state.customers);
   const availableServices = useAppSelector((state) => state.services.services);
   const inventoryItems = useAppSelector((state) => state.inventory.items);
+  const allUsers = useAppSelector((state) => state.users.users);
+  const me = useAppSelector((state) => state.auth.user);
+  const advisors = useMemo(
+    () => allUsers.filter((u) => u.role === 'service_advisor'),
+    [allUsers]
+  );
+  const mechanics = useMemo(
+    () => allUsers.filter((u) => u.role === 'mechanic'),
+    [allUsers]
+  );
+  const technicians = useMemo(
+    () => allUsers.filter((u) => u.role === 'primary_technician'),
+    [allUsers]
+  );
+  const isAdminLike = me?.role === 'admin' || me?.role === 'staff';
+  const isWorkforce = me?.role === 'service_advisor' || me?.role === 'mechanic' || me?.role === 'primary_technician';
+  const isReadOnlyWorkforce = me?.role === 'mechanic' || me?.role === 'primary_technician';
 
   // Derive available parts from inventory items
   const availableParts: PartItem[] = useMemo(() =>
@@ -101,6 +120,9 @@ export default function JobCardsPage() {
   const [selectedServices, setSelectedServices] = useState<ServiceItem[]>([]);
   const [selectedParts, setSelectedParts] = useState<PartItem[]>([]);
   const [assignees, setAssignees] = useState<Assignment[]>(defaultAssignees);
+  const [assignedAdvisorId, setAssignedAdvisorId] = useState<string>('');
+  const [assignedMechanicId, setAssignedMechanicId] = useState<string>('');
+  const [assignedTechnicianId, setAssignedTechnicianId] = useState<string>('');
   const [issues, setIssues] = useState<string[]>(['']);
   const [photos, setPhotos] = useState<VehiclePhoto[]>([]);
 
@@ -190,6 +212,9 @@ export default function JobCardsPage() {
     setCustomerVehicles([]);
     setSelectedVehicleId(null);
     setAssignees(defaultAssignees);
+    setAssignedAdvisorId('');
+    setAssignedMechanicId('');
+    setAssignedTechnicianId('');
     setIssues(['']);
     setPhotos([]);
     form.reset({ customerName: '', vehicleName: '', licensePlate: '', notes: '' });
@@ -206,6 +231,9 @@ export default function JobCardsPage() {
     setCustomerVehicles(cust?.vehicles || []);
     setSelectedVehicleId(job.vehicleId || null);
     setAssignees(job.assignees.length ? job.assignees : defaultAssignees);
+    setAssignedAdvisorId(job.assignedAdvisorId ?? '');
+    setAssignedMechanicId(job.assignedMechanicId ?? '');
+    setAssignedTechnicianId(job.assignedTechnicianId ?? '');
     setIssues(job.issues.length ? job.issues : ['']);
     setPhotos(job.photos ?? []);
     form.reset({
@@ -270,12 +298,22 @@ export default function JobCardsPage() {
       return;
     }
 
+    const advisor = advisors.find((u) => u.id === assignedAdvisorId);
+    const mechanic = mechanics.find((u) => u.id === assignedMechanicId);
+    const technician = technicians.find((u) => u.id === assignedTechnicianId);
+
     if (editingJob) {
       dispatch(updateJobCard({
         ...editingJob,
         ...data,
         issues: cleanedIssues,
         assignees: cleanedAssignees,
+        assignedAdvisorId: advisor?.id,
+        assignedAdvisorName: advisor?.name,
+        assignedMechanicId: mechanic?.id,
+        assignedMechanicName: mechanic?.name,
+        assignedTechnicianId: technician?.id,
+        assignedTechnicianName: technician?.name,
         notes: data.notes || '',
         services: selectedServices,
         parts: selectedParts,
@@ -301,6 +339,12 @@ export default function JobCardsPage() {
         licensePlate: data.licensePlate,
         issues: cleanedIssues,
         assignees: cleanedAssignees,
+        assignedAdvisorId: advisor?.id,
+        assignedAdvisorName: advisor?.name,
+        assignedMechanicId: mechanic?.id,
+        assignedMechanicName: mechanic?.name,
+        assignedTechnicianId: technician?.id,
+        assignedTechnicianName: technician?.name,
         notes: data.notes || '',
         photos,
         status: 'pending',
@@ -355,7 +399,9 @@ export default function JobCardsPage() {
         </motion.div>
         <div className="flex items-center gap-3">
           <ViewToggle view={view} onChange={setView} />
-          <Button onClick={handleCreate} icon={<Plus className="h-4 w-4" />}>New Job</Button>
+          {isAdminLike && (
+            <Button onClick={handleCreate} icon={<Plus className="h-4 w-4" />}>New Job</Button>
+          )}
         </div>
       </div>
 
@@ -390,7 +436,14 @@ export default function JobCardsPage() {
       {view === 'list' ? (
         <div className="space-y-3">
           {paginatedJobs.map((job, idx) => (
-            <motion.div key={job.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }} className="glass rounded-2xl p-5 hover:bg-[var(--bg-glass-hover)] transition-all group">
+            <motion.div
+              key={job.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: idx * 0.05 }}
+              onClick={isWorkforce ? () => router.push(`/admin/job-cards/${job.id}`) : undefined}
+              className={`glass rounded-2xl p-5 hover:bg-[var(--bg-glass-hover)] transition-all group ${isWorkforce ? 'cursor-pointer' : ''}`}
+            >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500/10 to-red-600/10 flex items-center justify-center flex-shrink-0">
@@ -405,7 +458,7 @@ export default function JobCardsPage() {
                           <QIcon className="w-3 h-3" />{qc.label}
                         </span>
                       ); })()}
-                      {job.quoteType && (
+                      {!isWorkforce && job.quoteType && (
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-md border text-[10px] font-semibold ${
                           job.quoteType === 'with_gst'
                             ? 'text-red-500 bg-red-500/10 border-red-500/20'
@@ -419,21 +472,31 @@ export default function JobCardsPage() {
                     <p className="text-xs text-[var(--text-tertiary)] mt-1 line-clamp-1">{job.issues.join(' • ')}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                   <div className="text-right mr-4 hidden lg:block">
-                    <p className="text-sm font-semibold text-[var(--text-primary)]">{formatCurrency(job.estimatedCost)}</p>
+                    {!isWorkforce && (
+                      <p className="text-sm font-semibold text-[var(--text-primary)]">{formatCurrency(job.estimatedCost)}</p>
+                    )}
                     <p className="text-xs text-[var(--text-tertiary)]">{formatDate(job.createdAt)}</p>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => handleView(job)} title="View Details" icon={<Eye className="h-3.5 w-3.5" />} />
-                  <Button variant="ghost" size="sm" onClick={() => handleEstimate(job)} title="Estimate" icon={<DollarSign className="h-3.5 w-3.5" />} />
-                  {job.estimatedCost > 0 && !job.quoteStatus && (
+                  <Button variant="ghost" size="sm" onClick={() => isWorkforce ? router.push(`/admin/job-cards/${job.id}`) : handleView(job)} title="View Details" icon={<Eye className="h-3.5 w-3.5" />} />
+                  {!isWorkforce && (
+                    <Button variant="ghost" size="sm" onClick={() => handleEstimate(job)} title="Estimate" icon={<DollarSign className="h-3.5 w-3.5" />} />
+                  )}
+                  {isAdminLike && job.estimatedCost > 0 && !job.quoteStatus && (
                     <Button variant="ghost" size="sm" onClick={() => handleSendQuote(job)} title="Send Quote" icon={<Send className="h-3.5 w-3.5 text-blue-500" />} />
                   )}
-                  <Button variant="ghost" size="sm" onClick={() => handleEdit(job)} title="Edit" icon={<Edit2 className="h-3.5 w-3.5" />} />
-                  <select value={job.status} onChange={(e) => { const newStatus = e.target.value as JobCardStatus; dispatch(updateJobCardStatus({ id: job.id, status: newStatus })); toast.info('Status Updated', `Job status changed to ${newStatus.replace('_', ' ')}`); simulateSendStatusNotification(dispatch, job, newStatus); toast.info('Customer Notified', `Status update sent to ${job.customerName}`); }} className="px-2 py-1 rounded-lg text-xs bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[var(--text-primary)] focus:outline-none">
-                    <option value="pending">Pending</option><option value="approved">Approved</option><option value="in_progress">In Progress</option><option value="completed">Completed</option>
-                  </select>
-                  <Button variant="ghost" size="sm" onClick={() => { dispatch(deleteJobCard(job.id)); toast.error('Job Deleted', `${job.vehicleName} job has been removed`); }} title="Delete" icon={<Trash2 className="h-3.5 w-3.5 text-red-400" />} />
+                  {isAdminLike && (
+                    <Button variant="ghost" size="sm" onClick={() => handleEdit(job)} title="Edit" icon={<Edit2 className="h-3.5 w-3.5" />} />
+                  )}
+                  {!isReadOnlyWorkforce && (
+                    <select value={job.status} onChange={(e) => { const newStatus = e.target.value as JobCardStatus; dispatch(updateJobCardStatus({ id: job.id, status: newStatus })); toast.info('Status Updated', `Job status changed to ${newStatus.replace('_', ' ')}`); if (isAdminLike) { simulateSendStatusNotification(dispatch, job, newStatus); toast.info('Customer Notified', `Status update sent to ${job.customerName}`); } }} className="px-2 py-1 rounded-lg text-xs bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[var(--text-primary)] focus:outline-none">
+                      <option value="pending">Pending</option><option value="approved">Approved</option><option value="in_progress">In Progress</option><option value="completed">Completed</option>
+                    </select>
+                  )}
+                  {isAdminLike && (
+                    <Button variant="ghost" size="sm" onClick={() => { dispatch(deleteJobCard(job.id)); toast.error('Job Deleted', `${job.vehicleName} job has been removed`); }} title="Delete" icon={<Trash2 className="h-3.5 w-3.5 text-red-400" />} />
+                  )}
                 </div>
               </div>
             </motion.div>
@@ -442,7 +505,14 @@ export default function JobCardsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {paginatedJobs.map((job, idx) => (
-            <motion.div key={job.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }}>
+            <motion.div
+              key={job.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: idx * 0.05 }}
+              onClick={isWorkforce ? () => router.push(`/admin/job-cards/${job.id}`) : undefined}
+              className={isWorkforce ? 'cursor-pointer' : ''}
+            >
               <Card>
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-1.5 flex-wrap">
@@ -452,7 +522,7 @@ export default function JobCardsPage() {
                         <QIcon className="w-2.5 h-2.5" />{qc.label}
                       </span>
                     ); })()}
-                    {job.quoteType && (
+                    {!isWorkforce && job.quoteType && (
                       <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md border text-[9px] font-semibold ${
                         job.quoteType === 'with_gst'
                           ? 'text-red-500 bg-red-500/10 border-red-500/20'
@@ -468,15 +538,23 @@ export default function JobCardsPage() {
                 <p className="text-sm text-[var(--text-secondary)] mt-0.5">{job.customerName}</p>
                 <p className="text-xs text-[var(--text-tertiary)] mt-0.5">{job.licensePlate}</p>
                 <p className="text-xs text-[var(--text-tertiary)] mt-2 line-clamp-2">{job.issues.join(' • ')}</p>
-                <div className="flex items-center justify-between mt-4 pt-3 border-t border-[var(--border-color)]">
-                  <p className="text-sm font-bold gradient-text">{formatCurrency(job.estimatedCost)}</p>
+                <div className="flex items-center justify-between mt-4 pt-3 border-t border-[var(--border-color)]" onClick={(e) => e.stopPropagation()}>
+                  {isWorkforce ? (
+                    <span className="text-xs text-[var(--text-tertiary)]">Job ID #{job.id.slice(-6)}</span>
+                  ) : (
+                    <p className="text-sm font-bold gradient-text">{formatCurrency(job.estimatedCost)}</p>
+                  )}
                   <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="sm" onClick={() => handleView(job)} title="View Details" icon={<Eye className="h-3.5 w-3.5" />} />
-                    {job.estimatedCost > 0 && !job.quoteStatus && (
+                    <Button variant="ghost" size="sm" onClick={() => isWorkforce ? router.push(`/admin/job-cards/${job.id}`) : handleView(job)} title="View Details" icon={<Eye className="h-3.5 w-3.5" />} />
+                    {isAdminLike && job.estimatedCost > 0 && !job.quoteStatus && (
                       <Button variant="ghost" size="sm" onClick={() => handleSendQuote(job)} title="Send Quote" icon={<Send className="h-3.5 w-3.5 text-blue-500" />} />
                     )}
-                    <Button variant="ghost" size="sm" onClick={() => handleEdit(job)} title="Edit" icon={<Edit2 className="h-3.5 w-3.5" />} />
-                    <Button variant="ghost" size="sm" onClick={() => { dispatch(deleteJobCard(job.id)); toast.error('Job Deleted', `${job.vehicleName} job has been removed`); }} title="Delete" icon={<Trash2 className="h-3.5 w-3.5 text-red-400" />} />
+                    {isAdminLike && (
+                      <Button variant="ghost" size="sm" onClick={() => handleEdit(job)} title="Edit" icon={<Edit2 className="h-3.5 w-3.5" />} />
+                    )}
+                    {isAdminLike && (
+                      <Button variant="ghost" size="sm" onClick={() => { dispatch(deleteJobCard(job.id)); toast.error('Job Deleted', `${job.vehicleName} job has been removed`); }} title="Delete" icon={<Trash2 className="h-3.5 w-3.5 text-red-400" />} />
+                    )}
                   </div>
                 </div>
               </Card>
@@ -609,10 +687,66 @@ export default function JobCardsPage() {
             )}
           </div>
 
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-[var(--text-secondary)]">
+                <span className="flex items-center gap-1.5"><UserCog className="h-3.5 w-3.5" /> Service Advisor</span>
+              </label>
+              <select
+                value={assignedAdvisorId}
+                onChange={(e) => setAssignedAdvisorId(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl text-sm bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-red-500/30"
+              >
+                <option value="">— Unassigned —</option>
+                {advisors.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}{u.status === 'invited' ? ' · pending' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-[var(--text-secondary)]">
+                <span className="flex items-center gap-1.5"><UserCog className="h-3.5 w-3.5" /> Mechanic</span>
+              </label>
+              <select
+                value={assignedMechanicId}
+                onChange={(e) => setAssignedMechanicId(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl text-sm bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-red-500/30"
+              >
+                <option value="">— Unassigned —</option>
+                {mechanics.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}{u.status === 'invited' ? ' · pending' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-[var(--text-secondary)]">
+                <span className="flex items-center gap-1.5"><UserCog className="h-3.5 w-3.5" /> Primary Technician</span>
+              </label>
+              <select
+                value={assignedTechnicianId}
+                onChange={(e) => setAssignedTechnicianId(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl text-sm bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-red-500/30"
+              >
+                <option value="">— Unassigned —</option>
+                {technicians.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}{u.status === 'invited' ? ' · pending' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="block text-sm font-medium text-[var(--text-secondary)]">
-                <span className="flex items-center gap-1.5"><UserCog className="h-3.5 w-3.5" /> Assigned To</span>
+                <span className="flex items-center gap-1.5"><UserCog className="h-3.5 w-3.5" /> Other Assignees</span>
               </label>
               <button
                 type="button"

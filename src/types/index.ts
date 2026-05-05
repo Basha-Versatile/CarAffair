@@ -1,4 +1,12 @@
-export type UserRole = 'admin' | 'staff' | 'customer';
+export type UserRole =
+  | 'admin'
+  | 'staff'
+  | 'customer'
+  | 'service_advisor'
+  | 'mechanic'
+  | 'primary_technician';
+
+export type UserStatus = 'invited' | 'active';
 
 export interface User {
   id: string;
@@ -6,6 +14,8 @@ export interface User {
   email: string;
   role: UserRole;
   avatar?: string;
+  status?: UserStatus;
+  createdAt?: string;
 }
 
 export interface Customer {
@@ -84,6 +94,12 @@ export interface JobCard {
   estimatedCost: number;
   actualCost: number;
   assignees: Assignment[];
+  assignedAdvisorId?: string;
+  assignedAdvisorName?: string;
+  assignedMechanicId?: string;
+  assignedMechanicName?: string;
+  assignedTechnicianId?: string;
+  assignedTechnicianName?: string;
   notes: string;
   createdAt: string;
   updatedAt: string;

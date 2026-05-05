@@ -10,6 +10,7 @@ import { fetchInventory } from '@/features/inventory/inventorySlice';
 import { fetchServices } from '@/features/services/servicesSlice';
 import { fetchSlots } from '@/features/slots/slotsSlice';
 import { fetchAdminAlerts } from '@/features/notifications/notificationSlice';
+import { fetchUsers } from '@/features/users/usersSlice';
 
 export default function AppBootstrap({ children }: { children: React.ReactNode }) {
   const dispatch = useAppDispatch();
@@ -33,11 +34,28 @@ export default function AppBootstrap({ children }: { children: React.ReactNode }
     if (role !== 'admin' && role !== 'staff') return;
     dispatch(fetchSlots(undefined));
     dispatch(fetchAdminAlerts());
+    dispatch(fetchUsers(undefined));
     const interval = setInterval(() => {
       dispatch(fetchAdminAlerts());
       dispatch(fetchSlots(undefined));
       dispatch(fetchCustomers());
     }, 30_000);
+    return () => clearInterval(interval);
+  }, [dispatch, role]);
+
+  // Staff (admins + workforce) poll job cards so newly assigned/updated jobs
+  // appear without a manual refresh.
+  useEffect(() => {
+    const isStaff =
+      role === 'admin' ||
+      role === 'staff' ||
+      role === 'service_advisor' ||
+      role === 'mechanic' ||
+      role === 'primary_technician';
+    if (!isStaff) return;
+    const interval = setInterval(() => {
+      dispatch(fetchJobCards());
+    }, 15_000);
     return () => clearInterval(interval);
   }, [dispatch, role]);
 

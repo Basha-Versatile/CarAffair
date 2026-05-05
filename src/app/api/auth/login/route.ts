@@ -12,7 +12,12 @@ export async function POST(req: Request) {
     const user = await User.findOne({ email: String(email).toLowerCase() });
     if (!user) throw new ApiError('Invalid credentials', 401);
 
-    const ok = await verifyPassword(password, user.passwordHash);
+    const userDoc = user as unknown as { passwordHash?: string; status?: string };
+    if (userDoc.status === 'invited' || !userDoc.passwordHash) {
+      throw new ApiError('Please set your password using the invite link first.', 403);
+    }
+
+    const ok = await verifyPassword(password, userDoc.passwordHash);
     if (!ok) throw new ApiError('Invalid credentials', 401);
 
     const token = await signSession({

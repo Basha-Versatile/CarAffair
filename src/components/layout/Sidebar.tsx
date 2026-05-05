@@ -14,24 +14,35 @@ import {
   Package,
   Star,
   CalendarDays,
+  UserCog,
   ChevronLeft,
   ChevronRight,
   LogOut,
 } from 'lucide-react';
+import type { UserRole } from '@/types';
 import { cn } from '@/utils/cn';
 import { useAppSelector } from '@/store/hooks';
 import { useSignOut } from '@/hooks/useSignOut';
 
-const navItems = [
-  { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, badge: '' },
-  { href: '/admin/customers', label: 'Customers', icon: Users, badge: '' },
-  { href: '/admin/vehicles', label: 'Vehicles', icon: Car, badge: '' },
+interface NavItem {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  badge: string;
+  roles?: UserRole[];
+}
+
+const navItems: NavItem[] = [
+  { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, badge: '', roles: ['admin', 'staff'] },
+  { href: '/admin/customers', label: 'Customers', icon: Users, badge: '', roles: ['admin', 'staff'] },
+  { href: '/admin/vehicles', label: 'Vehicles', icon: Car, badge: '', roles: ['admin', 'staff'] },
   { href: '/admin/job-cards', label: 'Jobs', icon: ClipboardList, badge: '' },
-  { href: '/admin/slots', label: 'Slots', icon: CalendarDays, badge: '' },
-  { href: '/admin/billing', label: 'Billing', icon: Receipt, badge: '' },
-  { href: '/admin/inventory', label: 'Inventory', icon: Package, badge: '' },
-  { href: '/admin/services', label: 'Services', icon: Wrench, badge: '' },
-  { href: '/admin/reviews', label: 'Reviews', icon: Star, badge: '' },
+  { href: '/admin/slots', label: 'Slots', icon: CalendarDays, badge: '', roles: ['admin', 'staff'] },
+  { href: '/admin/billing', label: 'Billing', icon: Receipt, badge: '', roles: ['admin', 'staff'] },
+  { href: '/admin/inventory', label: 'Inventory', icon: Package, badge: '', roles: ['admin', 'staff'] },
+  { href: '/admin/services', label: 'Services', icon: Wrench, badge: '', roles: ['admin', 'staff'] },
+  { href: '/admin/reviews', label: 'Reviews', icon: Star, badge: '', roles: ['admin', 'staff'] },
+  { href: '/admin/users', label: 'Users', icon: UserCog, badge: '', roles: ['admin', 'staff'] },
 ];
 
 interface SidebarProps {
@@ -47,6 +58,9 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const handleLogout = async () => {
     await signOut();
   };
+
+  const role = user?.role;
+  const visibleNavItems = navItems.filter((item) => !item.roles || (role && item.roles.includes(role)));
 
   return (
     <motion.aside
@@ -115,7 +129,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
         </AnimatePresence>
 
         <nav className="space-y-1">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const isActive = pathname === item.href || (item.href !== '/admin' && pathname.startsWith(item.href));
             return (
               <Link key={item.href} href={item.href}>
