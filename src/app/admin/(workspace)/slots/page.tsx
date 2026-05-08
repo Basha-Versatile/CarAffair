@@ -15,6 +15,7 @@ import Input from '@/components/ui/Input';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import Modal from '@/components/ui/Modal';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useToast } from '@/components/ui/Toast';
 import { useModal } from '@/hooks/useModal';
 import { Skeleton, SkeletonHeader } from '@/components/ui/Skeleton';
@@ -120,6 +121,7 @@ export default function SlotsPage() {
   const [autoDuration, setAutoDuration] = useState(60);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<BulkScheduleResponse | null>(null);
+  const [pendingClearDate, setPendingClearDate] = useState<string | null>(null);
 
   useEffect(() => {
     dispatch(fetchSlots(undefined));
@@ -307,8 +309,12 @@ export default function SlotsPage() {
     }
   };
 
-  const handleClearDay = async (date: string) => {
-    if (!confirm(`Delete all unbooked slots for ${formatDateLabel(date)}?`)) return;
+  const requestClearDay = (date: string) => setPendingClearDate(date);
+
+  const confirmClearDay = async () => {
+    if (!pendingClearDate) return;
+    const date = pendingClearDate;
+    setPendingClearDate(null);
     try {
       const res = await dispatch(clearDaySlots(date)).unwrap();
       if (res.deletedIds.length === 0) {
@@ -370,7 +376,7 @@ export default function SlotsPage() {
                   {removable > 0 && (
                     <button
                       type="button"
-                      onClick={() => handleClearDay(date)}
+                      onClick={() => requestClearDay(date)}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all cursor-pointer"
                       title="Delete all unbooked slots for this day"
                     >
@@ -617,6 +623,16 @@ export default function SlotsPage() {
           </div>
         )}
       </Modal>
+
+      <ConfirmDialog
+        isOpen={!!pendingClearDate}
+        title="Clear day"
+        message={pendingClearDate ? `Delete all unbooked slots for ${formatDateLabel(pendingClearDate)}? Booked slots will not be touched.` : ''}
+        confirmLabel="Clear day"
+        destructive
+        onConfirm={confirmClearDay}
+        onClose={() => setPendingClearDate(null)}
+      />
     </div>
   );
 }

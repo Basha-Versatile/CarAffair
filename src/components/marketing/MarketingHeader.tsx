@@ -98,12 +98,20 @@ export default function MarketingHeader() {
                   My Account
                 </Link>
               ) : (
-                <Link
-                  href="/me/login"
-                  className="px-4 py-2.5 rounded-full text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]/50 transition-colors"
-                >
-                  Sign in
-                </Link>
+                <>
+                  <Link
+                    href="/me/login"
+                    className="px-4 py-2.5 rounded-full text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]/50 transition-colors"
+                  >
+                    Sign in
+                  </Link>
+                  <Link
+                    href="/me/sign-up"
+                    className="px-4 py-2.5 rounded-full text-sm font-medium glass-card hover:bg-[var(--bg-glass-hover)] transition-colors"
+                  >
+                    Sign up
+                  </Link>
+                </>
               )}
               <Link
                 href="/book"
@@ -146,9 +154,14 @@ export default function MarketingHeader() {
                       My Account
                     </Link>
                   ) : (
-                    <Link href="/me/login" onClick={closeMenu} className="px-4 py-3 rounded-xl text-sm font-medium text-center glass-card">
-                      Sign in
-                    </Link>
+                    <>
+                      <Link href="/me/login" onClick={closeMenu} className="px-4 py-3 rounded-xl text-sm font-medium text-center glass-card">
+                        Sign in
+                      </Link>
+                      <Link href="/me/sign-up" onClick={closeMenu} className="px-4 py-3 rounded-xl text-sm font-medium text-center glass-card">
+                        Sign up
+                      </Link>
+                    </>
                   )}
                   <Link
                     href="/book"

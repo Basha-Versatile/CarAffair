@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Sun, Moon, Bell, Search, User, Settings, LogOut, ChevronDown,
   CheckCircle, XCircle, CreditCard, Star, MessageSquare, Clock, CalendarDays,
+  ShoppingCart, Truck, UserPlus,
 } from 'lucide-react';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { markAdminAlertRead, markAllAlertsRead } from '@/features/notifications/notificationSlice';
@@ -23,6 +24,9 @@ const alertConfig: Record<AlertType, { icon: typeof CheckCircle; color: string; 
   job_created: { icon: MessageSquare, color: 'text-purple-500', bg: 'bg-purple-500/10' },
   status_updated: { icon: Clock, color: 'text-cyan-500', bg: 'bg-cyan-500/10' },
   booking_created: { icon: CalendarDays, color: 'text-red-500', bg: 'bg-red-500/10' },
+  vendor_quoted: { icon: ShoppingCart, color: 'text-indigo-500', bg: 'bg-indigo-500/10' },
+  vendor_dispatched: { icon: Truck, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+  customer_signed_up: { icon: UserPlus, color: 'text-teal-500', bg: 'bg-teal-500/10' },
 };
 
 export default function Header() {

@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Search, Package, AlertTriangle, Plus, Edit2, Trash2 } from 'lucide-react';
+import { Search, Package, AlertTriangle, Plus, Edit2, Trash2, ShoppingCart } from 'lucide-react';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { addInventoryItem, updateInventoryItem, deleteInventoryItem } from '@/features/inventory/inventorySlice';
 import { addAlert } from '@/features/notifications/notificationSlice';
@@ -37,6 +38,7 @@ type InventoryFormData = z.infer<typeof inventorySchema>;
 
 export default function InventoryPage() {
   const dispatch = useAppDispatch();
+  const router = useRouter();
   const { items, isLoading } = useAppSelector((state) => state.inventory);
   const [searchQuery, setSearchQuery] = useState('');
   const [view, setView] = useState<'grid' | 'list'>('list');
@@ -198,6 +200,15 @@ export default function InventoryPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex gap-1">
+                        {isLow && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => router.push(`/admin/purchase-orders?prefillInventoryId=${item.id}`)}
+                            title="Order from vendor"
+                            icon={<ShoppingCart className="h-3.5 w-3.5 text-amber-500" />}
+                          />
+                        )}
                         <Button variant="ghost" size="sm" onClick={() => handleEdit(item)} title="Edit" icon={<Edit2 className="h-3.5 w-3.5" />} />
                         <Button variant="ghost" size="sm" onClick={() => { dispatch(deleteInventoryItem(item.id)); toast.error('Item Deleted', `${item.name} removed from inventory`); }} title="Delete" icon={<Trash2 className="h-3.5 w-3.5 text-red-400" />} />
                       </div>
@@ -235,6 +246,15 @@ export default function InventoryPage() {
                     <div className="flex justify-between p-2 rounded-lg bg-[var(--bg-tertiary)]"><span className="text-[var(--text-tertiary)]">Supplier</span><span className="text-[var(--text-secondary)]">{item.supplier}</span></div>
                   </div>
                   <div className="flex justify-end gap-1 mt-3 pt-3 border-t border-[var(--border-color)]">
+                    {isLow && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => router.push(`/admin/purchase-orders?prefillInventoryId=${item.id}`)}
+                        title="Order from vendor"
+                        icon={<ShoppingCart className="h-3.5 w-3.5 text-amber-500" />}
+                      />
+                    )}
                     <Button variant="ghost" size="sm" onClick={() => handleEdit(item)} title="Edit" icon={<Edit2 className="h-3.5 w-3.5" />} />
                     <Button variant="ghost" size="sm" onClick={() => { dispatch(deleteInventoryItem(item.id)); toast.error('Item Deleted', `${item.name} removed`); }} title="Delete" icon={<Trash2 className="h-3.5 w-3.5 text-red-400" />} />
                   </div>

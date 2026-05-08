@@ -43,7 +43,7 @@ export default function BookPage() {
   const [devCode, setDevCode] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [confirmed, setConfirmed] = useState<{ date: string; startTime: string; endTime: string; lookupError?: string | null } | null>(null);
+  const [confirmed, setConfirmed] = useState<{ date: string; startTime: string; endTime: string; lookupError?: string | null; inviteUrl?: string | null } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -103,7 +103,7 @@ export default function BookPage() {
     setError(null);
     setSubmitting(true);
     try {
-      const res = await api.post<{ ok: boolean; booking: { date: string; startTime: string; endTime: string }; lookupError?: string | null }>(
+      const res = await api.post<{ ok: boolean; booking: { date: string; startTime: string; endTime: string }; lookupError?: string | null; inviteUrl?: string | null }>(
         '/api/otp/verify',
         { phone: details.phone.trim(), code: otp.trim() }
       );
@@ -112,6 +112,7 @@ export default function BookPage() {
         startTime: res.booking.startTime,
         endTime: res.booking.endTime,
         lookupError: res.lookupError,
+        inviteUrl: res.inviteUrl ?? null,
       });
       setStep('done');
     } catch (err) {
@@ -349,7 +350,25 @@ export default function BookPage() {
                   Note: vehicle lookup didn&apos;t complete ({confirmed.lookupError}). The workshop will fill in details on arrival.
                 </p>
               )}
-              <Link href="/" className="inline-block mt-2 text-sm font-medium text-red-500 hover:text-red-400">
+              <div className="mt-6 space-y-2">
+                <p className="text-xs text-[var(--text-tertiary)]">Want to track this service online?</p>
+                {confirmed.inviteUrl ? (
+                  <Link
+                    href={confirmed.inviteUrl.replace(/^https?:\/\/[^/]+/, '') || '/me/sign-up'}
+                    className="inline-block px-5 py-2.5 rounded-xl bg-red-500/15 border border-red-500/30 text-red-400 hover:text-red-300 hover:bg-red-500/20 text-sm font-medium transition-colors"
+                  >
+                    Set a password &amp; track this booking
+                  </Link>
+                ) : (
+                  <Link
+                    href="/me/sign-up"
+                    className="inline-block px-5 py-2.5 rounded-xl bg-red-500/15 border border-red-500/30 text-red-400 hover:text-red-300 hover:bg-red-500/20 text-sm font-medium transition-colors"
+                  >
+                    Create an account
+                  </Link>
+                )}
+              </div>
+              <Link href="/" className="inline-block mt-4 text-sm font-medium text-red-500 hover:text-red-400">
                 Back to home
               </Link>
             </motion.div>

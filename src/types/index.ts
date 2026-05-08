@@ -101,6 +101,7 @@ export interface JobCard {
   assignedTechnicianId?: string;
   assignedTechnicianName?: string;
   notes: string;
+  publicNotes?: string;
   createdAt: string;
   updatedAt: string;
   quoteToken?: string;
@@ -146,7 +147,68 @@ export type AlertType =
   | 'review_submitted'
   | 'job_created'
   | 'status_updated'
-  | 'booking_created';
+  | 'booking_created'
+  | 'vendor_quoted'
+  | 'vendor_dispatched'
+  | 'customer_signed_up';
+
+export interface Vendor {
+  id: string;
+  name: string;
+  contactPerson?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  categories: string[];
+  notes?: string;
+  status: 'active' | 'archived';
+  createdAt?: string;
+}
+
+export type PurchaseOrderStatus =
+  | 'draft'
+  | 'requested'
+  | 'quoted'
+  | 'accepted'
+  | 'rejected'
+  | 'dispatched'
+  | 'received'
+  | 'cancelled';
+
+export interface PurchaseOrderItem {
+  id: string;
+  inventoryItemId?: string;
+  name: string;
+  partNumber?: string;
+  quantity: number;
+  notes?: string;
+  unitPrice?: number;
+  availableInDays?: number;
+  vendorNote?: string;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  vendorId: string;
+  vendorName: string;
+  items: PurchaseOrderItem[];
+  status: PurchaseOrderStatus;
+  relatedJobCardId?: string;
+  notes?: string;
+  vendorToken?: string;
+  createdBy: string;
+  createdByName?: string;
+  sentAt?: string;
+  quotedAt?: string;
+  acceptedAt?: string;
+  rejectedAt?: string;
+  dispatchedAt?: string;
+  receivedAt?: string;
+  cancelledAt?: string;
+  rejectionReason?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
 export interface Slot {
   id: string;

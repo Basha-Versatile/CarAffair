@@ -48,3 +48,44 @@ export type WorkforceRole = (typeof WORKFORCE_ROLES)[number];
 export function isWorkforce(role: string | undefined): role is WorkforceRole {
   return role === 'service_advisor' || role === 'mechanic' || role === 'primary_technician';
 }
+
+const INTERNAL_ASSIGNEE_FIELDS = [
+  'assignedAdvisorId',
+  'assignedMechanicId',
+  'assignedTechnicianId',
+  'assignedAdvisorName',
+  'assignedMechanicName',
+  'assignedTechnicianName',
+  'assignees',
+];
+
+// Customer view: strips all prices AND internal-only fields. Keeps publicNotes; drops notes.
+export function stripCustomerJobView<T extends JobLike>(job: T): T {
+  const out = stripPrices(job) as Record<string, unknown>;
+  for (const f of INTERNAL_ASSIGNEE_FIELDS) delete out[f];
+  delete out.notes; // internal admin notes are not customer-facing
+  return out as T;
+}
+
+export function stripCustomerJobViewList<T extends JobLike>(jobs: T[]): T[] {
+  return jobs.map(stripCustomerJobView);
+}
+
+const BILL_PRICE_FIELDS = [
+  'servicesCost',
+  'partsCost',
+  'subtotal',
+  'taxRate',
+  'taxAmount',
+  'total',
+  'paymentMethod',
+  'paymentToken',
+  'paymentLinkStatus',
+  'paymentLinkSentAt',
+];
+
+export function stripCustomerBillView(bill: Record<string, unknown>): Record<string, unknown> {
+  const out = stripPrices(bill as JobLike) as Record<string, unknown>;
+  for (const f of BILL_PRICE_FIELDS) delete out[f];
+  return out;
+}

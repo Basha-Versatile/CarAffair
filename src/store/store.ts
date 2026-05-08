@@ -10,6 +10,8 @@ import inventoryReducer from '@/features/inventory/inventorySlice';
 import servicesReducer from '@/features/services/servicesSlice';
 import slotsReducer from '@/features/slots/slotsSlice';
 import usersReducer from '@/features/users/usersSlice';
+import vendorsReducer from '@/features/vendors/vendorsSlice';
+import purchaseOrdersReducer from '@/features/purchaseOrders/purchaseOrdersSlice';
 
 const rootReducer = combineReducers({
   auth: authReducer,
@@ -21,6 +23,8 @@ const rootReducer = combineReducers({
   services: servicesReducer,
   slots: slotsReducer,
   users: usersReducer,
+  vendors: vendorsReducer,
+  purchaseOrders: purchaseOrdersReducer,
 });
 
 const persistConfig = {

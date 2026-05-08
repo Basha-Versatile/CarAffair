@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
+import { randomBytes } from 'crypto';
 import { connectDB } from '@/lib/mongodb';
 import { Slot } from '@/models/Slot';
 import { Booking } from '@/models/Booking';
 import { Customer } from '@/models/Customer';
 import { Vehicle } from '@/models/Vehicle';
+import { User } from '@/models/User';
 import { Alert } from '@/models/Notification';
 import { ApiError, apiError } from '@/lib/auth';
 import { verifyOtp } from '@/lib/otpStore';
@@ -40,7 +42,32 @@ export async function POST(req: Request) {
         address: '—',
       });
     }
-    const customerId = String((customer as unknown as { _id: unknown })._id);
+    const customerDoc = customer as unknown as { _id: unknown; userId?: string };
+    const customerId = String(customerDoc._id);
+
+    // Auto-invite the customer to the portal: create an invited User row tied
+    // to this Customer so they can later set a password and track this booking.
+    let inviteUrl: string | null = null;
+    if (!customerDoc.userId) {
+      const userEmail = payload.email ?? `${payload.phone}@guest.caraffair.local`;
+      let user = await User.findOne({ email: userEmail });
+      if (!user) {
+        const inviteToken = randomBytes(24).toString('hex');
+        user = await User.create({
+          name: payload.name,
+          email: userEmail,
+          role: 'customer',
+          status: 'invited',
+          inviteToken,
+          inviteExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        });
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? '';
+        inviteUrl = `${baseUrl}/invite/${inviteToken}`;
+        console.log(`[INVITE customer] phone=${payload.phone} url=${inviteUrl}`);
+      }
+      const userId = String((user as unknown as { _id: unknown })._id);
+      await Customer.findByIdAndUpdate(customerId, { userId });
+    }
 
     // Surepass lookup is best-effort. On failure we still create a placeholder vehicle
     // so the admin can complete details later.
@@ -100,6 +127,7 @@ export async function POST(req: Request) {
       ok: true,
       booking: toJSON(booking as never),
       lookupError,
+      inviteUrl: process.env.NODE_ENV !== 'production' ? inviteUrl : undefined,
     });
   } catch (err) {
     return apiError(err);

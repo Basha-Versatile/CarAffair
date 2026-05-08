@@ -71,6 +71,12 @@ export async function requireRole(allowed: SessionRole[]): Promise<SessionPayloa
   return user;
 }
 
+export async function requireCustomer(): Promise<SessionPayload> {
+  const user = await requireUser();
+  if (user.role !== 'customer') throw new ApiError('Forbidden', 403);
+  return user;
+}
+
 export const STAFF_ROLES: SessionRole[] = ['admin', 'staff', 'service_advisor', 'mechanic', 'primary_technician'];
 export const ADMIN_ROLES: SessionRole[] = ['admin', 'staff'];
 

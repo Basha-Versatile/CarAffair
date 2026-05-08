@@ -9,7 +9,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Plus, Search, Filter, Edit2, Trash2, Eye, ChevronDown,
   ClipboardList, Wrench, DollarSign, Package, Users, Car,
-  Send, CheckCircle, XCircle, Clock, UserCog,
+  Send, CheckCircle, XCircle, Clock, UserCog, ShoppingCart,
 } from 'lucide-react';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import {
@@ -854,7 +854,22 @@ export default function JobCardsPage() {
           </div>
 
           <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2"><Package className="h-4 w-4" /> Parts</h3>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <h3 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2"><Package className="h-4 w-4" /> Parts</h3>
+              {editingJob && isAdminLike && (
+                <button
+                  type="button"
+                  onClick={() => router.push(`/admin/purchase-orders?prefillJobId=${editingJob.id}`)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 transition-colors cursor-pointer"
+                  title="Order parts from a vendor for this job"
+                >
+                  <ShoppingCart className="h-3.5 w-3.5" /> Order parts for this job
+                </button>
+              )}
+            </div>
+            {availableParts.length === 0 && (
+              <p className="text-xs text-[var(--text-tertiary)]">No parts in stock. Use &ldquo;Order parts for this job&rdquo; above to request from a vendor.</p>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {availableParts.map((part) => (
                 <button

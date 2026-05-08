@@ -58,6 +58,7 @@ const jobCardSchema = new Schema(
     assignedTechnicianId: { type: String, index: true },
     assignedTechnicianName: String,
     notes: String,
+    publicNotes: String,
     quoteToken: { type: String, index: true },
     quoteStatus: { type: String, enum: ['pending', 'sent', 'accepted', 'rejected'] },
     quoteSentAt: String,
@@ -72,6 +73,10 @@ const jobCardSchema = new Schema(
   },
   { timestamps: true }
 );
+
+if (process.env.NODE_ENV !== 'production' && models.JobCard) {
+  delete (models as Record<string, unknown>).JobCard;
+}
 
 export const JobCard: Model<unknown> =
   (models.JobCard as Model<unknown>) || model('JobCard', jobCardSchema);

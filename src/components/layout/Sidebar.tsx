@@ -15,6 +15,8 @@ import {
   Star,
   CalendarDays,
   UserCog,
+  Truck,
+  ShoppingCart,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -42,6 +44,8 @@ const navItems: NavItem[] = [
   { href: '/admin/inventory', label: 'Inventory', icon: Package, badge: '', roles: ['admin', 'staff'] },
   { href: '/admin/services', label: 'Services', icon: Wrench, badge: '', roles: ['admin', 'staff'] },
   { href: '/admin/reviews', label: 'Reviews', icon: Star, badge: '', roles: ['admin', 'staff'] },
+  { href: '/admin/vendors', label: 'Vendors', icon: Truck, badge: '', roles: ['admin', 'staff'] },
+  { href: '/admin/purchase-orders', label: 'Purchase Orders', icon: ShoppingCart, badge: '', roles: ['admin', 'staff'] },
   { href: '/admin/users', label: 'Users', icon: UserCog, badge: '', roles: ['admin', 'staff'] },
 ];
 
