@@ -39,15 +39,17 @@ function homeFor(role: Role | undefined): string {
 }
 
 const ADMIN_AUTH_PATHS = new Set(['/admin/login']);
+const CUSTOMER_AUTH_PATHS = new Set(['/me/login', '/me/sign-up']);
 
 export async function proxy(req: NextRequest) {
   const token = req.cookies.get(COOKIE_NAME)?.value;
   const session = await readSession(token);
   const path = req.nextUrl.pathname;
   const isAdminAuthPath = ADMIN_AUTH_PATHS.has(path);
+  const isCustomerAuthPath = CUSTOMER_AUTH_PATHS.has(path);
 
-  // Already-signed-in users should not see the auth pages.
-  if (isAdminAuthPath) {
+  // Already-signed-in users should not see auth pages — bounce them to their home.
+  if (isAdminAuthPath || isCustomerAuthPath) {
     if (session) {
       const url = req.nextUrl.clone();
       url.pathname = homeFor(session.role);
@@ -72,11 +74,12 @@ export async function proxy(req: NextRequest) {
     }
   }
 
-  // /me requires customer.
+  // /me (customer portal) requires a customer session — anonymous visitors go
+  // to /me/login, not /admin/login.
   if (path === '/me' || path.startsWith('/me/')) {
     if (!session) {
       const url = req.nextUrl.clone();
-      url.pathname = '/admin/login';
+      url.pathname = '/me/login';
       url.searchParams.set('next', path);
       return NextResponse.redirect(url);
     }
